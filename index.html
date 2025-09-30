@@ -1,85 +1,118 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Spam Email Detector</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background: linear-gradient(120deg, #141E30, #243B55);
-            color: white;
-            padding: 50px;
-        }
-        textarea {
-            width: 60%;
-            height: 150px;
-            border-radius: 10px;
-            padding: 10px;
-            font-size: 16px;
-        }
-        button {
-            margin-top: 20px;
-            padding: 10px 20px;
-            font-size: 18px;
-            border-radius: 8px;
-            border: none;
-            background: #4CAF50;
-            color: white;
-            cursor: pointer;
-        }
-        #result {
-            margin-top: 20px;
-            font-size: 22px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Spam Email Detector</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.9.0"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #1f4037, #99f2c8);
+      color: #fff;
+      text-align: center;
+      padding: 40px;
+    }
+    textarea {
+      width: 80%;
+      height: 150px;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: none;
+      resize: none;
+    }
+    button {
+      margin-top: 20px;
+      padding: 12px 25px;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      background-color: #ff9800;
+      color: white;
+      cursor: pointer;
+    }
+    button:disabled {
+      background-color: gray;
+      cursor: not-allowed;
+    }
+    #result {
+      margin-top: 25px;
+      font-size: 20px;
+      font-weight: bold;
+      background: rgba(0,0,0,0.3);
+      padding: 15px;
+      border-radius: 10px;
+      display: inline-block;
+    }
+  </style>
 </head>
 <body>
-    <h1>📧 Spam Email Detector</h1>
-    <p>Paste your email below to check if it's Spam or Ham (Not Spam).</p>
-    <textarea id="emailText" placeholder="Enter email text..."></textarea><br>
-    <button onclick="predictSpam()">Check Email</button>
-    <div id="result"></div>
 
-    <script>
-        let model;
-        let wordIndex = {};
+  <h1>📧 Spam Email Detector</h1>
+  <p>Enter your email text below and check if it is Spam or Ham (Not Spam).</p>
 
-        async function loadModel() {
-            model = await tf.loadLayersModel("tfjs_model/model.json");
-            console.log("✅ Model loaded");
-        }
+  <textarea id="emailText" placeholder="Paste your email content here..."></textarea><br>
+  <button id="checkBtn" onclick="predictSpam()" disabled>Check Email</button>
 
-        async function loadWordIndex() {
-            const response = await fetch("word_index.json");
-            wordIndex = await response.json();
-            console.log("✅ Word index loaded");
-        }
+  <div id="result"></div>
 
-        async function predictSpam() {
-            let text = document.getElementById("emailText").value.toLowerCase();
-            if (!text) {
-                document.getElementById("result").innerHTML = "⚠️ Please enter an email.";
-                return;
-            }
+  <script>
+    let model;
+    let wordIndex = {};
 
-            // Convert text to sequence
-            let words = text.split(/\s+/);
-            let sequence = words.slice(0, 100).map(w => wordIndex[w] || 0);
-            while (sequence.length < 100) sequence.push(0); // padding
+    async function init() {
+      try {
+        model = await tf.loadLayersModel("tfjs_model/model.json");
+        console.log("✅ Model loaded.");
+        document.getElementById("checkBtn").disabled = false;
+      } catch (err) {
+        console.error("❌ Error loading model:", err);
+      }
 
-            let input = tf.tensor2d([sequence]);
-            let prediction = model.predict(input);
-            let prob = (await prediction.data())[0];
+      try {
+        const response = await fetch("word_index.json");
+        wordIndex = await response.json();
+        console.log("✅ Word index loaded.");
+      } catch (err) {
+        console.error("❌ Error loading word index:", err);
+      }
+    }
 
-            let label = prob > 0.5 ? "🚨 Spam" : "✅ Ham (Not Spam)";
-            document.getElementById("result").innerHTML =
-                `Prediction: <b>${label}</b><br>Spam Probability: ${(prob*100).toFixed(2)}%`;
-        }
+    async function predictSpam() {
+      if (!model) {
+        document.getElementById("result").innerHTML = "⚠️ Model not loaded yet.";
+        return;
+      }
+      if (!wordIndex || Object.keys(wordIndex).length === 0) {
+        document.getElementById("result").innerHTML = "⚠️ Word index not loaded yet.";
+        return;
+      }
 
-        // Load everything
-        loadModel();
-        loadWordIndex();
-    </script>
+      let text = document.getElementById("emailText").value.toLowerCase();
+      if (!text.trim()) {
+        document.getElementById("result").innerHTML = "⚠️ Please enter an email.";
+        return;
+      }
+
+      let words = text.split(/\s+/);
+      let sequence = words.slice(0, 100).map(w => wordIndex[w] || 0);
+      while (sequence.length < 100) sequence.push(0);
+
+      let input = tf.tensor2d([sequence]);
+      let prediction = model.predict(input);
+      let prob = (await prediction.data())[0];
+
+      let label = prob > 0.5 ? "🚨 Spam" : "✅ Ham (Not Spam)";
+      document.getElementById("result").innerHTML =
+        `Prediction: <b>${label}</b><br>Spam Probability: ${(prob*100).toFixed(2)}%`;
+
+      input.dispose();
+      prediction.dispose();
+    }
+
+    // Load model + word index when page starts
+    init();
+  </script>
+
 </body>
 </html>
