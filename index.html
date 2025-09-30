@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Spam Email Detector</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: linear-gradient(120deg, #141E30, #243B55);
+            color: white;
+            padding: 50px;
+        }
+        textarea {
+            width: 60%;
+            height: 150px;
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 18px;
+            border-radius: 8px;
+            border: none;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 22px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📧 Spam Email Detector</h1>
+    <p>Paste your email below to check if it's Spam or Ham (Not Spam).</p>
+    <textarea id="emailText" placeholder="Enter email text..."></textarea><br>
+    <button onclick="predictSpam()">Check Email</button>
+    <div id="result"></div>
+
+    <script>
+        let model;
+        let wordIndex = {};
+
+        async function loadModel() {
+            model = await tf.loadLayersModel("tfjs_model/model.json");
+            console.log("✅ Model loaded");
+        }
+
+        async function loadWordIndex() {
+            const response = await fetch("word_index.json");
+            wordIndex = await response.json();
+            console.log("✅ Word index loaded");
+        }
+
+        async function predictSpam() {
+            let text = document.getElementById("emailText").value.toLowerCase();
+            if (!text) {
+                document.getElementById("result").innerHTML = "⚠️ Please enter an email.";
+                return;
+            }
+
+            // Convert text to sequence
+            let words = text.split(/\s+/);
+            let sequence = words.slice(0, 100).map(w => wordIndex[w] || 0);
+            while (sequence.length < 100) sequence.push(0); // padding
+
+            let input = tf.tensor2d([sequence]);
+            let prediction = model.predict(input);
+            let prob = (await prediction.data())[0];
+
+            let label = prob > 0.5 ? "🚨 Spam" : "✅ Ham (Not Spam)";
+            document.getElementById("result").innerHTML =
+                `Prediction: <b>${label}</b><br>Spam Probability: ${(prob*100).toFixed(2)}%`;
+        }
+
+        // Load everything
+        loadModel();
+        loadWordIndex();
+    </script>
+</body>
+</html>
